@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  # PostgreSQL база данных для хранения пользователей, сигналов, макро-данных и т.д.
+  postgres:
+    image: postgres:17
+    container_name: swingtrader-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres        # В продакшене сменить на сложный пароль
+      POSTGRES_DB: swingtrader
+    ports:
+      - "5432:5432"                       # Проброс порта для локального доступа
+    volumes:
+      - postgres_data:/var/lib/postgresql/data   # Именованный том для сохранения данных
+    restart: unless-stopped
+    networks:
+      - swingtrader-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis для кеширования данных MOEX, хранения сессий, брокера сообщений для Celery
+  redis:
+    image: redis:7-alpine
+    container_name: swingtrader-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - swingtrader-net
+    command: redis-server --appendonly yes   # Включение persistence
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+# Определение именованных томов для сохранения данных между перезапусками
+volumes:
+  postgres_data:
+  redis_data:
+
+# Сеть для взаимодействия контейнеров (если понадобится связать с бэкендом в будущем)
+networks:
+  swingtrader-net:
+    driver: bridge
